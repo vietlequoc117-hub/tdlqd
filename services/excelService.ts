@@ -538,16 +538,27 @@ export const generateConsolidatedExcel = async (data: ParsedData, term: TermOpti
   simpleAoa.push(simpleHeaders);
 
   // --- 3. SETUP XEPLOP SHEET ---
-  const xeplopHeader1: (string | null)[] = ['', 'TBM', null, null, null, 'XT GĐ trước', 'KQHT HKII', null, 'NN Đoàn', 'TĐ Đoàn', 'CSVC', 'XTTĐS', 'T.B', 'Xếp Lớp'];
-  const xeplopHeader2: (string | null)[] = ['CN', 'TB cũ', 'TB mới', 'Độ lệch', 'XT', 'XT', 'Tổng', 'XT', 'XTNN', 'XTĐ', 'XTCSVC', 'XTTĐS', 'TBLop', 'XTLop'];
+  const tCu = term === 'HKII' ? 'TB HKI' : 'TB cũ';
+  const tMoi = term === 'HKII' ? 'TB HKII' : 'TB mới';
+
+  const xeplopHeader1: (string | null)[] = ['CN', 'TBM', null, null, null, 'GĐ trước', 'KQHT HKII', null, 'Nề nếp', 'CT Đoàn', 'CSVC', 'TĐS', 'T.B', 'Xếp Lớp', 'Danh hiệu'];
+  const xeplopHeader2: (string | null)[] = [null, tCu, tMoi, 'Độ lệch', 'XT', 'XT', 'Tổng', 'XT', null, null, null, null, null, null, null];
   const xeplopMerges: XLSX.Range[] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, // Title merged across all cols
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }, // Title merged across all cols
       { s: { r: 1, c: 1 }, e: { r: 1, c: 4 } },   // TBM spans 4 columns: TB cũ, TB mới, Độ lệch, XT
-      { s: { r: 1, c: 6 }, e: { r: 1, c: 7 } }    // KQHT HKII spans 2 columns: Tổng, XT
+      { s: { r: 1, c: 6 }, e: { r: 1, c: 7 } },   // KQHT HKII spans 2 columns: Tổng, XT
+      { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },   // CN vertically
+      { s: { r: 1, c: 8 }, e: { r: 2, c: 8 } },   // Nề nếp vertical
+      { s: { r: 1, c: 9 }, e: { r: 2, c: 9 } },   // CT Đoàn vertical
+      { s: { r: 1, c: 10 }, e: { r: 2, c: 10 } }, // CSVC vertical
+      { s: { r: 1, c: 11 }, e: { r: 2, c: 11 } }, // TĐS vertical
+      { s: { r: 1, c: 12 }, e: { r: 2, c: 12 } }, // T.B vertical
+      { s: { r: 1, c: 13 }, e: { r: 2, c: 13 } }, // Xếp Lớp vertical
+      { s: { r: 1, c: 14 }, e: { r: 2, c: 14 } }  // Danh hiệu vertical
   ];
   
   const xeplopAoa: (string | number | null)[][] = [
-      [config.title],
+      [`TỔNG HỢP THI ĐUA ${term.toUpperCase()} - NĂM HỌC ${year}`],
       xeplopHeader1,
       xeplopHeader2
   ];
@@ -856,7 +867,8 @@ export const generateConsolidatedExcel = async (data: ParsedData, term: TermOpti
             xtCsvcValue ?? null,
             tdsValue ?? null,
             tbLop, 
-            xtLop
+            xtLop,
+            null
         ];
         xeplopAoa.push(xeplopRow);
         
@@ -1073,6 +1085,10 @@ export const generateConsolidatedExcel = async (data: ParsedData, term: TermOpti
               cell.s.font = { name: 'Times New Roman', sz: 12 };
               if (R < headerRows || (cell.v && String(cell.v) !== '' && (String(cell.v).includes('T.Khối') || String(cell.v).includes('GIÁO VIÊN CHỦ NHIỆM') || String(cell.v).match(/^Khối \d+/)))) {
                   cell.s.font.bold = true;
+              }
+              
+              if (R === 0 && cell.v && String(cell.v).includes('TỔNG HỢP')) {
+                  cell.s.font.color = { rgb: "FF0000" };
               }
               
               cell.s.border = {
