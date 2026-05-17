@@ -1,5 +1,5 @@
 
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import type { ParsedData, KqDiem, KqGv, KqDoan, MergedClassData, UploadedFiles, FileKey, DashboardData, ClassResult, GradeData, KqNam, TermOption, KqNeNep, KqGd, KqCsvc, KqTds, SubjectRankInfo } from '../types';
 
 // This function needs to be exposed on the window for App.tsx to call it.
@@ -1057,6 +1057,49 @@ export const generateConsolidatedExcel = async (data: ParsedData, term: TermOpti
   XLSX.utils.book_append_sheet(wbMain, khenCaoWorksheet, 'KhenCaoGV');
   
   // DOWNLOAD BOTH FILES
+  const applyGlobalStyles = (worksheet: XLSX.WorkSheet, headerRows: number) => {
+      if (!worksheet || !worksheet['!ref']) return;
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+              const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+              let cell = worksheet[cellAddress];
+              if (!cell) {
+                  cell = { v: '', t: 's' };
+                  worksheet[cellAddress] = cell;
+              }
+              if (!cell.s) cell.s = {};
+              
+              cell.s.font = { name: 'Times New Roman', sz: 12 };
+              if (R < headerRows || (cell.v && String(cell.v) !== '' && (String(cell.v).includes('T.Khối') || String(cell.v).includes('GIÁO VIÊN CHỦ NHIỆM') || String(cell.v).match(/^Khối \d+/)))) {
+                  cell.s.font.bold = true;
+              }
+              
+              cell.s.border = {
+                  top: { style: 'thin', color: { rgb: "000000" } },
+                  bottom: { style: 'thin', color: { rgb: "000000" } },
+                  left: { style: 'thin', color: { rgb: "000000" } },
+                  right: { style: 'thin', color: { rgb: "000000" } }
+              };
+              
+              if (!cell.s.alignment) {
+                  cell.s.alignment = { vertical: 'center' };
+                  if (R < headerRows || typeof cell.v === 'number') {
+                     cell.s.alignment.horizontal = 'center';
+                  }
+              }
+          }
+      }
+  };
+
+  applyGlobalStyles(tongHopSheet, 3);
+  applyGlobalStyles(simpleSheet, 1);
+  applyGlobalStyles(xeplopSheet, 3);
+  applyGlobalStyles(kqhtSheet, 1);
+  applyGlobalStyles(cnWorksheet, 1);
+  applyGlobalStyles(gvWorksheet, 1);
+  applyGlobalStyles(khenCaoWorksheet, 1);
+
   // File 1: Full Report
   XLSX.writeFile(wbMain, `TONG_HOP_THI_DUA_${config.fileNamePart}_${year}.xlsx`);
   
