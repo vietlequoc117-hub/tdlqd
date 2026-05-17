@@ -286,26 +286,53 @@ export const processAndStructureData = (data: ParsedData): DashboardData => {
         xtHocTapMap.set(classCalculations[i].className, rank);
       }
 
-      // 2b. Calculate TBLop
-      const withScores = gradeClasses.map(c => {
+      // 2b. Calculate KQHT HKII and its ranks (xtKqht)
+      const gradeKqhtHk2Data = gradeClasses.map(c => {
           const { nenepData } = mergedData[c.className];
-          
           const xt = xtHocTapMap.get(c.className) || 0;
-          
           const xtGdVal = findValueCaseInsensitive(nenepData, 'XTGD') ?? findValueCaseInsensitive(nenepData, 'XT GĐ trước') ?? findValueCaseInsensitive(nenepData, 'XT GĐ Trước') ?? findValueCaseInsensitive(nenepData, 'XT GD Trước');
-          const xtGd = xtGdVal ? parseInt(String(xtGdVal), 10) : 0;
+          const xtGd = xtGdVal ? parseInt(String(xtGdVal), 10) : null;
+          
+          let tongKqht = null;
+          if (xt !== null && xtGd !== null && !isNaN(xtGd)) {
+              tongKqht = (xt + xtGd) / 2;
+          }
+          return { className: c.className, tongKqht };
+      });
+
+      const validKqhtData = gradeKqhtHk2Data.filter(d => d.tongKqht !== null).sort((a, b) => a.tongKqht! - b.tongKqht!);
+      const kqhtHk2Ranks = new Map<string, number>();
+      let kqRank = 1;
+      for (let i = 0; i < validKqhtData.length; i++) {
+          if (i > 0 && validKqhtData[i].tongKqht! > validKqhtData[i - 1].tongKqht!) {
+              kqRank = i + 1;
+          }
+          kqhtHk2Ranks.set(validKqhtData[i].className, kqRank);
+      }
+
+      // 2c. Calculate TBLop using the new formula
+      const withScores = gradeClasses.map(c => {
+          const { nenepData, diemData } = mergedData[c.className];
+          
+          const xtKqht = kqhtHk2Ranks.get(c.className) || 0;
           
           const xtnnVal = findValueCaseInsensitive(nenepData, 'XTNN');
           const xtnn = xtnnVal ? parseInt(String(xtnnVal), 10) : 0;
           
           const xtdVal = findValueCaseInsensitive(nenepData, 'XTĐ');
           const xtd = xtdVal ? parseInt(String(xtdVal), 10) : 0;
+          
+          const xtCsvcValue = findValueCaseInsensitive(nenepData, 'XTCSVC') ?? findValueCaseInsensitive(nenepData, 'CSVC');
+          const xtCsvc = xtCsvcValue ? parseInt(String(xtCsvcValue), 10) : 0;
+          
+          const tdsValue = findValueCaseInsensitive(nenepData, 'XTTĐS') ?? findValueCaseInsensitive(nenepData, 'TĐS') ?? findValueCaseInsensitive(diemData, 'TĐS');
+          const xtTds = tdsValue ? parseInt(String(tdsValue), 10) : 0;
 
-          const tbLop = (xt + xtGd + (2 * xtnn) + xtd) / 5;
+          const tbLop = (xtKqht * 2 + xtnn * 2 + xtd + xtCsvc + xtTds) / 7;
           return { ...c, totalScore: Number(tbLop.toFixed(2)) };
       });
 
-      // 2c. Calculate XTLop
+      // 2d. Calculate XTLop
       withScores.sort((a, b) => a.totalScore - b.totalScore); // Ascending
       let rankLop = 1;
       const finalized = withScores.map((c, i) => {
@@ -665,42 +692,6 @@ export const generateConsolidatedExcel = async (data: ParsedData, term: TermOpti
         deviationsAndRanksBySubject[subject] = ranks;
     });
 
-    // --- Calculate TBLop and XTLop ---
-    const gradeTbLopData = gradeClasses.map(className => {
-        const { nenepData } = mergedData[className];
-        
-        const xt = gradeRanks.get(className) || 0;
-        const xtGdVal = findValueCaseInsensitive(nenepData, 'XTGD') ?? 
-            findValueCaseInsensitive(nenepData, 'XT GĐ trước') ?? 
-            findValueCaseInsensitive(nenepData, 'XT GĐ Trước') ?? 
-            findValueCaseInsensitive(nenepData, 'XT GD Trước');
-        const xtGd = xtGdVal ? parseInt(String(xtGdVal), 10) : 0;
-        const xtnnVal = findValueCaseInsensitive(nenepData, 'XTNN');
-        const xtnn = xtnnVal ? parseInt(String(xtnnVal), 10) : 0;
-        const xtdVal = findValueCaseInsensitive(nenepData, 'XTĐ');
-        const xtd = xtdVal ? parseInt(String(xtdVal), 10) : 0;
-
-        const tbLop = (xt + xtGd + (2 * xtnn) + xtd) / 5;
-        return { className, tbLop };
-    });
-
-    gradeTbLopData.sort((a, b) => a.tbLop - b.tbLop);
-    const xtLopMap = new Map<string, number>();
-    let rankLop = 1;
-    for(let i=0; i<gradeTbLopData.length; i++) {
-        if (i > 0 && gradeTbLopData[i].tbLop > gradeTbLopData[i-1].tbLop) {
-            rankLop = i + 1;
-        }
-        xtLopMap.set(gradeTbLopData[i].className, rankLop);
-    }
-    
-    gradeTbLopData.forEach(item => {
-        allClassTbLopInfo[item.className] = {
-            tbLop: item.tbLop,
-            xtLop: xtLopMap.get(item.className) || 0
-        };
-    });
-
     // --- Calculate KQHT HKII ---
     const gradeKqhtHk2Data = gradeClasses.map(className => {
         const xt = gradeRanks.get(className) ?? null;
@@ -727,6 +718,45 @@ export const generateConsolidatedExcel = async (data: ParsedData, term: TermOpti
         }
         kqhtHk2Ranks.set(validKqhtData[i].className, kqRank);
     }
+
+    // --- Calculate TBLop and XTLop ---
+    const gradeTbLopData = gradeClasses.map(className => {
+        const { nenepData, diemData } = mergedData[className];
+        
+        const xtKqht = kqhtHk2Ranks.get(className) || 0;
+        
+        const xtnnVal = findValueCaseInsensitive(nenepData, 'XTNN');
+        const xtnn = xtnnVal ? parseInt(String(xtnnVal), 10) : 0;
+        
+        const xtdVal = findValueCaseInsensitive(nenepData, 'XTĐ');
+        const xtd = xtdVal ? parseInt(String(xtdVal), 10) : 0;
+
+        const xtCsvcValue = findValueCaseInsensitive(nenepData, 'XTCSVC') ?? findValueCaseInsensitive(nenepData, 'CSVC');
+        const xtCsvc = xtCsvcValue ? parseInt(String(xtCsvcValue), 10) : 0;
+        
+        const tdsValue = findValueCaseInsensitive(nenepData, 'XTTĐS') ?? findValueCaseInsensitive(nenepData, 'TĐS') ?? findValueCaseInsensitive(diemData, 'TĐS');
+        const xtTds = tdsValue ? parseInt(String(tdsValue), 10) : 0;
+
+        const tbLop = (xtKqht * 2 + xtnn * 2 + xtd + xtCsvc + xtTds) / 7;
+        return { className, tbLop };
+    });
+
+    gradeTbLopData.sort((a, b) => a.tbLop - b.tbLop);
+    const xtLopMap = new Map<string, number>();
+    let rankLop = 1;
+    for(let i=0; i<gradeTbLopData.length; i++) {
+        if (i > 0 && gradeTbLopData[i].tbLop > gradeTbLopData[i-1].tbLop) {
+            rankLop = i + 1;
+        }
+        xtLopMap.set(gradeTbLopData[i].className, rankLop);
+    }
+    
+    gradeTbLopData.forEach(item => {
+        allClassTbLopInfo[item.className] = {
+            tbLop: item.tbLop,
+            xtLop: xtLopMap.get(item.className) || 0
+        };
+    });
 
     // --- GENERATE ROWS ---
 
