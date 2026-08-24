@@ -1,6 +1,8 @@
 {
   "name": "Remix: THI ĐUA _ LQD",
-  "description": "",
+  "description": "Ứng dụng tổng hợp thi đua và xếp loại học tập - THPT Lê Quý Đôn",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
