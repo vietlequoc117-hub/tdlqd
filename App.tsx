@@ -3,10 +3,22 @@ import React, { useState, useCallback, useMemo } from 'react';
 import type { UploadedFiles, FileKey, KqDiem, KqGv, KqDoan, DashboardData, ParsedData, KqNam, TermOption, KqNeNep, KqGd } from './types';
 import { generateConsolidatedExcel, identifyAndSortFiles, processAndStructureData } from './services/excelService';
 import { FileUploader } from './components/FileUploader';
-import { DownloadIcon, LoaderIcon, CheckCircleIcon, FileIcon, RefreshIcon } from './components/Icons';
+import { DownloadIcon, LoaderIcon, CheckCircleIcon, FileIcon, RefreshIcon, KeyIcon, LogOutIcon } from './components/Icons';
 import { Dashboard } from './components/Dashboard';
+import { LoginScreen } from './components/LoginScreen';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
+
+const DEFAULT_PASSWORD = '123456';
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('lqd_auth') === 'true' || sessionStorage.getItem('lqd_auth') === 'true';
+  });
+  const [appPassword, setAppPassword] = useState<string>(() => {
+    return localStorage.getItem('lqd_app_password') || DEFAULT_PASSWORD;
+  });
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
+
   const [files, setFiles] = useState<UploadedFiles>({
     diem: null,
     gv: null,
@@ -33,6 +45,25 @@ const App: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<string>(yearOptions[0]);
   const [processedYear, setProcessedYear] = useState<string | null>(null);
 
+  const handleLoginSuccess = (remember: boolean) => {
+    setIsAuthenticated(true);
+    if (remember) {
+      localStorage.setItem('lqd_auth', 'true');
+    } else {
+      sessionStorage.setItem('lqd_auth', 'true');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('lqd_auth');
+    sessionStorage.removeItem('lqd_auth');
+  };
+
+  const handlePasswordChanged = (newPass: string) => {
+    setAppPassword(newPass);
+    localStorage.setItem('lqd_app_password', newPass);
+  };
 
   const fileDisplayInfo: Record<FileKey, { title: string, status: string }> = {
     diem: { title: 'File Điểm & Xếp loại Môn', status: 'kqdiem.xlsx' },
@@ -145,17 +176,26 @@ const App: React.FC = () => {
 
   const isProcessButtonDisabled = Object.values(files).some((file) => file === null) || isLoading;
 
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen
+        validPassword={appPassword}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    );
+  }
+
   if (dashboardData && processedTerm && processedYear) {
     return (
         <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
-            <header className="flex flex-col sm:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-200 max-w-7xl mx-auto">
+            <header className="flex flex-col sm:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-200 max-w-7xl mx-auto gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">Bảng Điều Khiển Thi Đua - {processedTerm} ({processedYear})</h1>
                     <p className="mt-1 text-md text-text-secondary">
                         Phân tích tổng quan kết quả thi đua toàn trường.
                     </p>
                 </div>
-                <div className="flex items-center gap-4 mt-4 sm:mt-0">
+                <div className="flex flex-wrap items-center gap-3">
                      <button
                         onClick={handleDownload}
                         disabled={isLoading}
@@ -171,6 +211,23 @@ const App: React.FC = () => {
                         <RefreshIcon className="h-5 w-5" />
                         <span>Tải Tệp Mới</span>
                     </button>
+                    <div className="h-6 w-px bg-gray-300 hidden sm:block mx-1" />
+                    <button
+                        onClick={() => setIsChangePasswordOpen(true)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-text-secondary hover:text-text-primary text-sm font-medium border border-gray-300 rounded-lg shadow-xs transition-colors cursor-pointer"
+                        title="Đổi mật khẩu"
+                    >
+                        <KeyIcon className="h-4 w-4 text-primary" />
+                        <span className="hidden md:inline">Đổi mật khẩu</span>
+                    </button>
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium border border-red-200 rounded-lg shadow-xs transition-colors cursor-pointer"
+                        title="Đăng xuất"
+                    >
+                        <LogOutIcon className="h-4 w-4" />
+                        <span className="hidden md:inline">Đăng xuất</span>
+                    </button>
                 </div>
             </header>
             <main className="max-w-7xl mx-auto">
@@ -181,13 +238,39 @@ const App: React.FC = () => {
                 )}
                 <Dashboard data={dashboardData} />
             </main>
+
+            <ChangePasswordModal
+              isOpen={isChangePasswordOpen}
+              onClose={() => setIsChangePasswordOpen(false)}
+              currentStoredPassword={appPassword}
+              onPasswordChanged={handlePasswordChanged}
+            />
         </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div className="w-full max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-slate-50 to-indigo-50/30 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative">
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2">
+        <button
+          onClick={() => setIsChangePasswordOpen(true)}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-gray-50 text-text-secondary hover:text-text-primary text-xs sm:text-sm font-medium border border-gray-200 rounded-xl shadow-xs transition-all hover:shadow-sm cursor-pointer"
+          title="Đổi mật khẩu"
+        >
+          <KeyIcon className="h-4 w-4 text-primary" />
+          <span>Đổi mật khẩu</span>
+        </button>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-red-50 text-gray-500 hover:text-red-600 text-xs sm:text-sm font-medium border border-gray-200 hover:border-red-200 rounded-xl shadow-xs transition-all hover:shadow-sm cursor-pointer"
+          title="Đăng xuất"
+        >
+          <LogOutIcon className="h-4 w-4" />
+          <span>Đăng xuất</span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-4xl mx-auto pt-10 sm:pt-0">
         <header className="text-center mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">
             TỔNG HỢP THI ĐUA - LQĐ
@@ -297,6 +380,13 @@ const App: React.FC = () => {
           <p>&copy; {new Date().getFullYear()} AI Data Assistant. All rights reserved.</p>
         </footer>
       </div>
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        currentStoredPassword={appPassword}
+        onPasswordChanged={handlePasswordChanged}
+      />
     </div>
   );
 };
